@@ -1,6 +1,8 @@
 #!/usr/bin/python
 #bioinfo.py
 
+## this is what we'll run the most
+
 __author__ = '''Hyunju Kim'''
 
 import os

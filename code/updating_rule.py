@@ -2,6 +2,8 @@
 #attractor-analysis.py
 #last update: 17 DEC 2015
 
+## this is what we'll have to edit the most
+
 __author__ = '''Hyunju Kim'''
 
 
