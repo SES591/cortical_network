@@ -1,11 +1,10 @@
 #!/usr/bin/python
-#attractor-analysis.py
+#updating_rule.py
 #last update: 17 DEC 2015
 
 ## this is what we'll have to edit the most
 
-__author__ = '''Hyunju Kim'''
-
+__author__ = '''Hyunju Kim/Harrison Smith'''
 
 import os
 import sys
@@ -14,58 +13,81 @@ import networkx as nx
 from collections import OrderedDict
 
 import input_net as inet
-
-
-
-################# begin: sigmoid_updating ######################
-def sigmoid_updating(net, prevState):
-    """Update according to fixed thresholds for each node"""
-
-    '''
-        Arguments:
-                1. net
-                2. prevState
-        Return:
-               1. currState
-    '''
     
-    currState = {}
-    #### compute the current states of nodes in the net ####
-    for v in net.nodes():
-        #### compute weighted sum for node v over its neighbors u ####
-        eSum = 0
-        for u in net.predecessors_iter(v):
-            #iterate over input nodes u to node v
-            w_uv = 1.0*net[u][v]['weight']
-            eSum += w_uv * prevState[u]
-        #### determine the current state for v as a function of eSum and threshold of v ####
-        if eSum < net.node[v]['threshold']:
-            currState[v] = 0
-        if eSum > net.node[v]['threshold']:
-            currState[v] = 1
-        if eSum == net.node[v]['threshold']:
-            currState[v] = prevState[v]
+#############################################################
+def boolean_updating(G):
+    """
+    Update according to AND and NOT boolean rules
 
-    return currState
-    
-################# end: sigmoid_updating ########################
+    Arguments:
+        G [networkx Graph object]
 
+    Outputs:
+        curr_state [dict]
+            Dictionary of keys=nodes, values=states of graph after updating
+
+    NOTES:
+        -iterate over nodes u to connected to node v
+        -this should activate node only if ALL conditions are met
+
+        Remember: 1=True, 0=False
+        
+        for edges: False=inhibited, True=activated. 
+        for nodes: False=not expressed, True=expressed
+        
+        Possibilities (node refers to u--the comparison node):
+              edge=False, node=False. result == True
+              edge=False, node=True. results == False
+              edge=True, node=False. results == False
+              edge=True, node=True. results == True
+        
+        Therefore: if edge==node THEN results == True. THUS v node is activated.
+
+    """
+
+    G_prev = G.copy() # previous state of graph
+    prev_state = nx.get_node_attributes(G_prev,'state') # dict of {node:state} in previous state of graph
+
+    ## Update each (v) nodes state, provided v isn't-inhibited/is-induced by each node u
+    for v in G.nodes():
+
+        for u in G.predecessors_iter(v):
+
+            if G[u][v]['weight'] == nx.get_node_attributes(G,'state')[u]:
+
+                nx.set_node_attributes(G, 'state', {v:1}) #change v node to expressed
+            
+            else: ## All conditions must be met for node to be expressed
+                nx.set_node_attributes(G, 'state', {v:0}) #else, if conditions are ever not met, set node==False and break out of comparing to u nodes
+                break
+
+    curr_state = nx.get_node_attributes(G,'state') # dict of key=node, value=state of updated network G
+
+    return curr_state
+
+###############################################################
 def main():
     print "updating_rule module is the main code."
-    EDGE_FILE = '../data/example/example-net-edges.dat'
-    NODE_FILE = '../data/example/example-net-nodes.dat'
+    edge_file = '../data/inputs/edges-init.dat'
+    node_file = '../data/inputs/ant-nodes-init.dat'
     
-    net = inet.read_network_from_file(EDGE_FILE, NODE_FILE)
+    G = inet.read_network_from_file(edge_file, node_file)
 
-    #prevState = {'a':0.0, 'b':0.0, 'c':1.0}
-    prevState = {}
-    prevState['a'] = float(sys.argv[1])
-    prevState['b'] = float(sys.argv[2])
-    prevState['c'] = float(sys.argv[3])
-    print "network state @ previous step", OrderedDict(sorted(prevState.items(), key=lambda t: t[0]))
+    print G.nodes()
+    print G.edges()
+
+    prev_state = nx.get_node_attributes(G,'state') # dict of key=node, value=state of network G
+
+    print "network state @ prev step", OrderedDict(sorted(prev_state.items(), key=lambda t: t[0]))
     
-    currState = sigmoid_updating(net, prevState)
-    print "network state @ current step", OrderedDict(sorted(currState.items(), key=lambda t: t[0]))
+    curr_state = boolean_updating(G)
+
+    print "network state @ curr step", OrderedDict(sorted(curr_state.items(), key=lambda t: t[0]))
+
+    print prev_state
+    print curr_state
+
+    exit()
 
 if __name__=='__main__':
     main()
