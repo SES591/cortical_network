@@ -3,7 +3,7 @@
 
 ## this is what we'll run the most
 
-__author__ = '''Hyunju Kim'''
+__author__ = '''Hyunju Kim/Harrison Smith'''
 
 import os
 import sys
@@ -14,136 +14,185 @@ import matplotlib.pyplot as plt
 import input_net as inet
 import updating_rule as ur
 
+## Global Params ##
+n_states = 2 # number of states for a node (same as Nbr_States)
 
-################# BEGIN: decimal_to_binary(nodes_list, decState, Nbr_States=2) ########################
-def decimal_to_binary(nodes_list, decState, Nbr_States=2): # more left in the nodes list means higher order of 2 in binary
-    biStates = {}
-    x = len(nodes_list) -1
-    for u in nodes_list:
-        biStates[u] = decState / np.power(Nbr_States, x)
-        decState = decState % np.power(Nbr_States, x)
-        x = x - 1
-    return biStates
-################# END: decimal_to_binary(nodes_list, decState, Nbr_States=2) ########################
+###################
 
 
-################# BEGIN: binary_to_decimal(nodes_list, biStates, Nbr_States=2) ########################
-def binary_to_decimal(nodes_list, biStates, Nbr_States=2):  # more left in the nodes list means higher order of 2 in binary
-    decState = 0
-    x = len(nodes_list) -1
-    for u in nodes_list:
-        decState = decState + biStates[u]  * np.power(Nbr_States, x)
-        x = x - 1
-    return decState
-################# END: binary_to_decimal(nodes_list, biStates, Nbr_States=2) ########################
+#########################################
+def decimal_to_binary(nodes_list, network_ID): # more left in the nodes list means higher order of 2 in binary
+    """:
+        Converts network_ID (eg 1024) 
+        to 
+        network_bID (eg. {'pS': 1, 'pP': 1, 'gS': 1, 'gF': 1, 'gP': 1, 'pC': 1, 'gE': 1, 'pF': 1, 'pE': 1, 'gC': 1})
 
-
-################# BEGIN: ensemble_time_series(net, nodes_list, Nbr_States=2, MAX_TimeStep=20, Transition_Step=0) ########################
-def ensemble_time_series(net, nodes_list, Nbr_States=2, MAX_TimeStep=20):
-    
-    '''
         Arguments:
-        1. net
-        2. Nbr_States
-        3. MAX_TimeStep
+            nodes_list [list of strs]
+                list of nodes in the network
+
+            network_ID [int]
+                network_ID specifiying unique initial network configuration
+
+        Returns:
+            network_bID [dict of booleans]
+                Dictionary of key=node, value= 0 or 1 specifying node state
+    """
+    network_bID = {}
+    x = len(nodes_list) -1 # x==len(n_nodes)-1? why is this the number of nodes - 1?
+    for node in nodes_list:
+        network_bID[node] = network_ID / (n_states**x)
+        network_ID = network_ID % (n_states**x)
+        x = x - 1
+
+    return network_bID
+
+#########################################
+def binary_to_decimal(nodes_list, network_bID):  # more left in the nodes list means higher order of 2 in binary
+    """:
+        Converts network_bID (eg. {'pS': 1, 'pP': 1, 'gS': 1, 'gF': 1, 'gP': 1, 'pC': 1, 'gE': 1, 'pF': 1, 'pE': 1, 'gC': 1})
+        to 
+        network_ID (eg 1024) 
+
+        Arguments:
+            nodes_list [list of strs]
+                list of nodes in the network
+
+            network_ID [int]
+                network_ID specifiying unique initial network configuration
+
+        Returns:
+            network_bID [dict of booleans]
+                Dictionary of key=node, value= 0 or 1 specifying node state
+    """
+    network_ID = 0
+    x = len(nodes_list) -1
+    for node in nodes_list:
+        network_ID = network_ID + network_bID[node] * (n_states**x)
+        x = x - 1
+    return network_ID
+
+#########################################
+def ensemble_time_series(G, nodes_list, timesteps=20):
+    ''':
+        Applies boolean updating rule to the network nodes for the specified number of timesteps.
+        AND
+        Applies boolean updating rule to the network nodes accross ALL possible initial network states.
+
+        Arguments:
+            G [networkx Graph object]
+
+            nodes_list [list of strs]
+                list of nodes in the network
+
+            timesteps [int]
+                number of timesteps for network to evolve
         
         Return:
-        1. timeSeriesData
-        '''
-    
-    Nbr_Nodes = len(net.nodes())
-    Nbr_All_Initial_States = np.power(Nbr_States, Nbr_Nodes)
-    
-    timeSeriesData = {}
-    for n in net.nodes():
-        timeSeriesData[n] = {}
-        for initState in range(0, Nbr_All_Initial_States):
-            timeSeriesData[n][initState] = []
-    
-    for initDecState in range(0, Nbr_All_Initial_States):
-        currBiState = decimal_to_binary(nodes_list, initDecState, Nbr_States)
-        for step in range(0, MAX_TimeStep):
-            prevBiState = currBiState.copy()
-            for n in nodes_list:
-                timeSeriesData[n][initDecState].append(prevBiState[n])
-            currBiState = ur.sigmoid_updating(net, prevBiState)
-
-    return timeSeriesData
-################# END: ensemble_time_series(net, nodes_list, Nbr_States=2, MAX_TimeStep=20) ########################
-
-
-################# BEGIN: net_state_transition_map(net, nodes_list, Nbr_States=2) ########################
-def net_state_transition(net, nodes_list, Nbr_States=2):
-
-    '''
-    Arguments:
-               1. net
-               2. Nbr_States
-    Return:
-               1. decStateTransMap
+            timeseriesdata [dict of (dict of list of ints)]
+                ex. {'gC': {0: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0], 1: [1, 0, 0, 1, 0, 0, 1, 0, 0, 1],...}, 'gF': {...}} 
+                innermost list (ex. [0, 1, 0, 0, 1, 0, 0, 1, 0, 0]) - timeseries of states of the node
+                innermost key (ex. 0)- network_ID specificing the initial state of all nodes in the network
+                outermost key (ex. 'gC')- node_ID specifing the node whose states are being listed
     '''
     
-    Nbr_Nodes = len(net.nodes())
-    Nbr_All_Initial_States = np.power(Nbr_States, Nbr_Nodes)
+    n_nodes = len(G.nodes()) # number of nodes in network
+    n_init_networks = n_states**n_nodes # number of possible initial network states
     
-    decStateTransMap = nx.DiGraph()
-    for prevDecState in range(0, Nbr_All_Initial_States):
-        prevBiState = decimal_to_binary(nodes_list, prevDecState, Nbr_States)
-        currBiState = ur.sigmoid_updating(net, prevBiState)
-        currDecState = binary_to_decimal(nodes_list, currBiState, Nbr_States)
-        decStateTransMap.add_edge(prevDecState, currDecState)
-    return decStateTransMap
-################# END: net_state_transition_map(net, nodes_list, Nbr_States=2) ########################
-
-
-################# BEGIN: attractor_analysis(decStateTransMap) ########################
-def find_attractor(decStateTransMap):
+    timeseriesdata = {}
+    ## Create empty time series list for every combination 
+    ## of node and initial network state
+    for node in G.nodes():
+        timeseriesdata[node] = {}
+        for network_ID in range(0, n_init_networks):
+            timeseriesdata[node][network_ID] = [] 
     
-    '''
+    ## Fill time series list with individual node states for 
+    ## every combination of node and initial network state
+    for network_ID in range(0, n_init_networks):
+        network_bID = decimal_to_binary(nodes_list, network_ID)
+        for step in range(0, timesteps):
+            prev_network_bID = network_bID.copy()
+            for node in nodes_list:
+                timeseriesdata[node][network_ID].append(prev_network_bID[node])
+            network_bID = ur.boolean_updating(G, prev_network_bID)
+
+    return timeseriesdata
+#########################################
+def net_state_transition(G, nodes_list):
+    ''':
         Arguments:
-        1. decStateTransMap
+            G [networkx Graph object]
+            
+            nodes_list [list of strs]
+                list of nodes in the network
         Return:
-        1. attractor
+            G_transition_graph [networkx Graph object]
+                networkx graph directed graph showing how network configurations map to one another
     '''
-    attractor_list = nx.simple_cycles(decStateTransMap) #in case of deterministic system, any cycle without considering edge direction will be directed cycle.
+    
+    n_nodes = len(G.nodes())
+    n_init_networks = n_states**n_nodes
+    G_transition_graph = nx.DiGraph()
+
+    for prev_network_ID in range(0, n_init_networks):
+
+        prev_network_bID = decimal_to_binary(nodes_list, prev_network_ID)
+        network_bID = ur.boolean_updating(G, prev_network_bID)
+        network_ID = binary_to_decimal(nodes_list, network_bID)
+        G_transition_graph.add_edge(prev_network_ID, network_ID) #this is a directed graph showing you attractor landscape for how each of the states trasitions to each other
+    
+    return G_transition_graph
+#########################################
+def find_attractor(G_transition_graph):
+    
+    ''':
+        Arguments:
+            G_transition_graph [networkx Graph object]
+                networkx graph directed graph showing how network configurations map to one another
+        Return:
+            attractors [dict of list of lists of ints]
+                ['fixed'] = [[532][948]]
+                ['cycle'] = []
+    '''
+    attractor_list = nx.simple_cycles(G_transition_graph) #in case of deterministic system, any cycle without considering edge direction will be directed cycle.
     attractors = {}
     attractors['fixed'] = []
     attractors['cycle'] = []
 
-    for u in attractor_list:
-        if len(u) == 1:
-            attractors['fixed'].append(u)
+    for network_ID in attractor_list:
+        if len(network_ID) == 1:
+            attractors['fixed'].append(network_ID)
         else:
-            attractors['cycle'].append(u)
+            attractors['cycle'].append(network_ID)
 
-    return attractors
-################# END: attractor_analysis(decStateTransMap) ########################
-
+    return attractors #this outputs decID of attractor states (fixed and cyclic)
+#########################################
 def main():
     print "time_evol module is the main code."
-    EDGE_FILE = '../data/example/example-net-edges.dat'
-    NODE_FILE = '../data/example/example-net-nodes.dat'
+    edge_file = '../data/inputs/edges-init.dat' 
+    node_file = '../data/inputs/ant-nodes-init.dat'
     
-    net = inet.read_network_from_file(EDGE_FILE, NODE_FILE)
-    nodes_list = inet.build_nodes_list(NODE_FILE)
+    G = inet.read_network_from_file(edge_file, node_file)
+    nodes_list = G.nodes() # print graph nodes without states. Could also do nx.nodes(G)
 
-    timeSeriesData = ensemble_time_series(net, nodes_list, 2, 10)#, Nbr_States=2, MAX_TimeStep=20)
-    
+    print G.nodes()
 
-    initState = 1
-    biStates = decimal_to_binary(nodes_list, initState)
+    #####
+
+    timeseriesdata = ensemble_time_series(G, nodes_list, 10)#, timesteps=20)
+
+    network_ID = 1 #this is the ID of the init state
+    biStates = decimal_to_binary(nodes_list, network_ID)
     print 'initial state', biStates
-    print 'a', timeSeriesData['a'][1]
-    print 'b', timeSeriesData['b'][1]
-    print 'c', timeSeriesData['c'][1]
+    for node in G.nodes():
+        print node, timeseriesdata[node][1]
 
+    G_transition_graph = net_state_transition(G, nodes_list)
+    # nx.draw(G_transition_graph)
+    # plt.show()
 
-    decStateTransMap = net_state_transition(net, nodes_list)
-    nx.draw(decStateTransMap)
-    plt.show()
-    
-
-    attractors = find_attractor(decStateTransMap)
+    attractors = find_attractor(G_transition_graph)
     print attractors
 
 

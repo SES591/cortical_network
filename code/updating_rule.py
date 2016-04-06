@@ -15,7 +15,7 @@ from collections import OrderedDict
 import input_net as inet
     
 #############################################################
-def boolean_updating(G):
+def boolean_updating(G, prev_state=None):
     """
     Update according to AND and NOT boolean rules
 
@@ -45,8 +45,11 @@ def boolean_updating(G):
 
     """
 
-    G_prev = G.copy() # previous state of graph
-    prev_state = nx.get_node_attributes(G_prev,'state') # dict of {node:state} in previous state of graph
+    ## Calc prev_state from default network if not provided
+    if prev_state == None:
+
+        G_prev = G.copy() # previous state of graph
+        prev_state = nx.get_node_attributes(G_prev,'state') # dict of {node:state} in previous state of graph
 
     ## Update each (v) nodes state, provided v isn't-inhibited/is-induced by each node u
     for v in G.nodes():
