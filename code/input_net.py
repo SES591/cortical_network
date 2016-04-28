@@ -69,11 +69,23 @@ def read_network_from_file(edge_file, node_file):
 #################################################################
 
 def main():
+    import matplotlib.pyplot as plt
     print "input_net module is the main code."
     edge_file = '../data/inputs/edges-init.dat' #'../data/example/example-net-edges.dat'
     node_file = '../data/inputs/ant-nodes-init.dat' #'../data/example/example-net-nodes.dat'
 
     G = read_network_from_file(edge_file, node_file)
+
+    # nx.draw(G)
+
+    states=nx.get_node_attributes(G,'state')
+    pos = nx.spring_layout(G)
+    nx.draw(G,pos)
+    nx.draw_networkx_labels(G, pos, labels=states)
+    weights = nx.get_edge_attributes(G,'weight')
+    nx.draw_networkx_edge_labels(G,pos,edge_labels=weights)
+    # plt.savefig(<wherever>)
+    plt.show()
 
     print "Edges:\n",G.edges(data=True) # print graph edges with weights
     print "Nodes:\n",nx.get_node_attributes(G,'state') # print nodes with states
